@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Okul Not Yönetim Sistemi</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+body{
+    font-family: Arial;
+    background:#eef2f5;
+    display:flex;
+    justify-content:center;
+    padding:30px;
+}
+.container{
+    background:white;
+    width:900px;
+    padding:25px;
+    border-radius:15px;
+    box-shadow:0 0 15px rgba(0,0,0,0.15);
+}
+select,input,button{
+    width:100%;
+    padding:10px;
+    margin-top:8px;
+    border-radius:8px;
+    border:1px solid #aaa;
+}
+button{
+    cursor:pointer;
+    background:#007bff;
+    color:white;
+    font-size:16px;
+}
+button:hover{opacity:0.9}
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:15px;
+}
+th,td{
+    border:1px solid #ccc;
+    padding:8px;
+    text-align:center;
+}
+th{background:#f2f2f2}
+h2,h3{text-align:center}
+hr{margin:20px 0}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h2>🏫 Okul Not Yönetim Sistemi</h2>
+
+<h3>1️⃣ Excel Dosyalarını Yükle</h3>
+<input type="file" id="excelFiles" multiple accept=".xlsx,.xls">
+<button onclick="dosyalariYukle()">Listeleri Yükle</button>
+
+<hr>
+
+<h3>2️⃣ Sınıf & Öğrenci Seç</h3>
+<select id="sinifSelect" onchange="ogrencileriGetir()">
+<option value="">Sınıf Seç</option>
+</select>
+
+<select id="ogrenciSelect">
+<option value="">Öğrenci Seç</option>
+</select>
+
+<input type="number" id="sinavNot" placeholder="Sınav Notu">
+<input type="number" id="denemeNot" placeholder="Deneme Notu">
+
+<button onclick="notKaydet()">Not Kaydet</button>
+
+<hr>
+
+<h3>📊 Sınıf Ortalamaları</h3>
+<table id="sinifTablo">
+<tr>
+<th>Sınıf</th>
+<th>Sınav Ort.</th>
+<th>Deneme Ort.</th>
+</tr>
+</table>
+
+<h3>🏫 Okul Geneli</h3>
+<table>
+<tr>
+<th>Genel Sınav Ort.</th>
+<th>Genel Deneme Ort.</th>
+</tr>
+<tr>
+<td id="genelSinav">-</td>
+<td id="genelDeneme">-</td>
+</tr>
+</table>
+
+</div>
+
+<script>
+let okul = {}; 
+// okul["9A"]["Ali"] = {sinav:[..], deneme:[..]}
+
+function dosyalariYukle(){
+    let files = document.getElementById("excelFiles").files;
+    if(files.length===0){alert("Dosya seç!");return;}
+
+    let sayac=0;
+    for(let f of files){
+        let reader=new FileReader();
+        reader.onload=e=>{
+            let wb=XLSX.read(e.target.result,{type:"binary"});
+            let rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+            rows.forEach(r=>{
+                let sinif=r[0], isim=r[1];
+                if(!sinif||!isim)return;
+                if(!okul[sinif]) okul[sinif]={};
+                if(!okul[sinif][isim]) okul[sinif][isim]={sinav:[],deneme:[]};
+            });
+            sayac++;
+            if(sayac===files.length){
+                siniflariGuncelle();
+                alert("Tüm listeler yüklendi");
+            }
+        };
+        reader.readAsBinaryString(f);
+    }
+}
+
+function siniflariGuncelle(){
+    let s=document.getElementById("sinifSelect");
+    s.innerHTML='<option value="">Sınıf Seç</option>';
+    Object.keys(okul).sort().forEach(k=>{
+        let o=document.createElement("option");
+        o.value=k;o.textContent=k;
+        s.appendChild(o);
+    });
+}
+
+function ogrencileriGetir(){
+    let sinif=sinifSelect.value;
+    ogrenciSelect.innerHTML='<option value="">Öğrenci Seç</option>';
+    if(!okul[sinif])return;
+    Object.keys(okul[sinif]).forEach(o=>{
+        let opt=document.createElement("option");
+        opt.value=o; opt.textContent=o;
+        ogrenciSelect.appendChild(opt);
+    });
+}
+
+function notKaydet(){
+    let s=sinifSelect.value;
+    let o=ogrenciSelect.value;
+    let sn=Number(sinavNot.value);
+    let dn=Number(denemeNot.value);
+    if(!s||!o){alert("Sınıf ve öğrenci seç");return;}
+    if(sn) okul[s][o].sinav.push(sn);
+    if(dn) okul[s][o].deneme.push(dn);
+    sinavNot.value=""; denemeNot.value="";
+    hesapla();
+}
+
+function ort(arr){
+    return arr.length? (arr.reduce((a,b)=>a+b,0)/arr.length):0;
+}
+
+function hesapla(){
+    let st=document.getElementById("sinifTablo");
+    st.innerHTML='<tr><th>Sınıf</th><th>Sınav Ort.</th><th>Deneme Ort.</th></tr>';
+
+    let gs=[], gd=[];
+    for(let s in okul){
+        let ss=[], dd=[];
+        for(let o in okul[s]){
+            ss.push(...okul[s][o].sinav);
+            dd.push(...okul[s][o].deneme);
+        }
+        let so=ort(ss), doo=ort(dd);
+        if(so) gs.push(so);
+        if(doo) gd.push(doo);
+
+        let r=st.insertRow();
+        r.insertCell(0).textContent=s;
+        r.insertCell(1).textContent=so.toFixed(2);
+        r.insertCell(2).textContent=doo.toFixed(2);
+    }
+    genelSinav.textContent=ort(gs).toFixed(2);
+    genelDeneme.textContent=ort(gd).toFixed(2);
+}
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
